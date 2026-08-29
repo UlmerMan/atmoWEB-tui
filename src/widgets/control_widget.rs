@@ -67,7 +67,7 @@ impl Widget for &ControlWidget {
         block.render(area, buf);
 
         let current_line = Line::from(vec![
-            Span::styled("Ist:  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("current:  ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{:.1} {}", self.current, self.unit),
                 Style::default(),
@@ -76,7 +76,7 @@ impl Widget for &ControlWidget {
         .alignment(Alignment::Center);
 
         let target_line = Line::from(vec![
-            Span::styled("Soll: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("target: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{:.1} {}", self.value, self.unit),
                 Style::default()

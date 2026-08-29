@@ -11,6 +11,7 @@ use ratatui::{
 
 use crate::atmoweb::AtmoWeb;
 use crate::widgets::control_widget::ControlWidget;
+use crate::widgets::graph_widget::GraphWidget;
 
 const REFRESH_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -45,6 +46,7 @@ pub struct App {
     temp: ControlWidget,
     flap: ControlWidget,
     fan: ControlWidget,
+    graph: GraphWidget,
     focus: Focus,
     status: String,
     online: bool,
@@ -53,16 +55,17 @@ pub struct App {
 
 impl App {
     pub fn new(oven_ip: String) -> Self {
-        let mut temp = ControlWidget::new("Temperatur [0]", 21.0, "°C", 0.5, 5.0, 300.0);
-        temp.select(); // Fokus startet auf der Temperatur-Kachel
+        let mut temp = ControlWidget::new("Temperature [0]", 20.0, "°C", 0.5, 20.0, 300.0);
+        temp.select();
 
         Self {
             oven: AtmoWeb::new(oven_ip.clone()),
             oven_ip,
             exit: false,
             temp,
-            flap: ControlWidget::new("Klappe [1]", 0.0, "%", 1.0, 0.0, 100.0),
-            fan: ControlWidget::new("Lüfter [2]", 0.0, "%", 1.0, 0.0, 100.0),
+            flap: ControlWidget::new("Flap [1]", 0.0, "%", 1.0, 0.0, 100.0),
+            fan: ControlWidget::new("Fan [2]", 0.0, "%", 1.0, 0.0, 100.0),
+            graph: GraphWidget::new("Temperature Curve", "°C", 0.0, 300.0),
             focus: Focus::Temp,
             status: "Bereit".to_string(),
             online: false,
@@ -95,25 +98,40 @@ impl App {
         if let Ok(v) = self.oven.read_fan().await {
             self.fan.set_current(v as f32);
         }
+
+        self.graph.push_sample(self.temp.current, self.oven.read_set_temp().await.unwrap());
     }
 
-    fn layout(&self, frame: &Frame) -> [Rect; 4] {
-        let vertical = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+    fn layout(&self, frame: &Frame) -> [Rect; 5] {
+        let horizontal = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
             .split(frame.area());
 
-        let top = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(vertical[0]);
+        let side_bar = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Fill(1),
+                    Constraint::Length(3),
+                ]
+                .as_ref(),
+            )
+            .split(horizontal[0]);
+        
+        let control_widgets = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Percentage(33),
+                    Constraint::Percentage(33),
+                    Constraint::Percentage(33),
+                ]
+                .as_ref(),
+            )
+            .split(side_bar[0]);
 
-        let bottom = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(vertical[1]);
-
-        [top[0], top[1], bottom[0], bottom[1]]
+        [control_widgets[0], control_widgets[1], control_widgets[2], side_bar[1], horizontal[1]]
     }
 
     fn draw(&self, frame: &mut Frame) {
@@ -124,11 +142,9 @@ impl App {
         frame.render_widget(&self.fan, tiles[2]);
 
         let info = format!(
-            "Ofen: {} ({})\n\n{}\n\nTab: Kachel wechseln\n↵: Soll-Wert senden\n(Auto-Refresh alle {}s)",
+            "Ofen: {} ({})",
             self.oven_ip,
-            if self.online { "online" } else { "offline" },
-            self.status,
-            REFRESH_INTERVAL.as_secs(),
+            if self.online { "online" } else { "offline" }
         );
 
         let block = Block::default().title("Status").borders(Borders::ALL);
@@ -141,6 +157,8 @@ impl App {
                     Color::Red
                 }));
         frame.render_widget(paragraph, tiles[3]);
+
+        frame.render_widget(&self.graph, tiles[4]);
     }
 
     async fn handle_events(&mut self) -> Result<(), Box<dyn Error>> {

@@ -57,6 +57,11 @@ impl AtmoWeb {
         Ok(resp["TempSet"].as_f64().unwrap_or_default() as f32)
     }
 
+    pub async fn read_set_temp(&self) -> Result<f32, Box<dyn Error>> {
+        let resp = self.query(&[("TempSet", None)]).await?;
+        Ok(resp["TempSet"].as_f64().unwrap_or_default() as f32)
+    }
+
     pub async fn read_temp1(&self) -> Result<f64, Box<dyn Error>> {
         let resp = self.query(&[("Temp1Read", None)]).await?;
         Ok(resp["Temp1Read"].as_f64().unwrap_or_default())
