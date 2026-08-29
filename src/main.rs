@@ -1,10 +1,15 @@
 use atmoWEB_tui::atmoweb::AtmoWeb;
+use atmoWEB_tui::cli;
 
 use std::error::Error;
 
+use clap::Parser;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let oven = AtmoWeb::new("192.168.1.25");
+    let args = cli::Args::parse();
+
+    let oven = AtmoWeb::new(&args.address);
     println!("Oven created with IP: {}", oven.get_ip_address().await);
     
     println!("Checking if oven is online... ");
