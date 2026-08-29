@@ -54,33 +54,33 @@ impl AtmoWeb {
     pub async fn set_temp(&self, celsius: f32) -> Result<f32, Box<dyn Error>> {
         let val = celsius.to_string();
         let resp = self.query(&[("TempSet", Some(val.as_str()))]).await?;
-        Ok(resp["TempSet"].as_f64().unwrap() as f32)
+        Ok(resp["TempSet"].as_f64().unwrap_or_default() as f32)
     }
 
     pub async fn read_temp1(&self) -> Result<f64, Box<dyn Error>> {
         let resp = self.query(&[("Temp1Read", None)]).await?;
-        Ok(resp["Temp1Read"].as_f64().unwrap())
+        Ok(resp["Temp1Read"].as_f64().unwrap_or_default())
     }
 
     pub async fn read_flap(&self) -> Result<f64, Box<dyn Error>> {
         let resp = self.query(&[("FlapSet", None)]).await?;
-        Ok(resp["FlapSet"].as_f64().unwrap())
+        Ok(resp["FlapSet"].as_f64().unwrap_or_default())
     }
 
     pub async fn set_flap(&self, value: f64) -> Result<f64, Box<dyn Error>> {
         let val = value.to_string();
         let resp = self.query(&[("FlapSet", Some(val.as_str()))]).await?;
-        Ok(resp["FlapSet"].as_f64().unwrap())
+        Ok(resp["FlapSet"].as_f64().unwrap_or_default())
     }
 
     pub async fn read_fan(&self) -> Result<f64, Box<dyn Error>> {
         let resp = self.query(&[("FanRead", None)]).await?;
-        Ok(resp["FanRead"].as_f64().unwrap())
+        Ok(resp["FanRead"].as_f64().unwrap_or_default())
     }
 
     pub async fn set_fan(&self, value: f64) -> Result<f64, Box<dyn Error>> {
         let val = value.to_string();
         let resp = self.query(&[("FanSet", Some(val.as_str()))]).await?;
-        Ok(resp["FanSet"].as_f64().unwrap())
+        Ok(resp["FanSet"].as_f64().unwrap_or_default())
     }
 }

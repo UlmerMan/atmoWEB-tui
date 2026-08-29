@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::time::{Duration, Instant};
 
 use ratatui::{
     DefaultTerminal, Frame,
@@ -10,6 +11,8 @@ use ratatui::{
 
 use crate::atmoweb::AtmoWeb;
 use crate::widgets::control_widget::ControlWidget;
+
+const REFRESH_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Focus {
@@ -45,7 +48,7 @@ pub struct App {
     focus: Focus,
     status: String,
     online: bool,
-    current_temp: Option<f64>,
+    last_refresh: Instant,
 }
 
 impl App {
@@ -63,14 +66,17 @@ impl App {
             focus: Focus::Temp,
             status: "Bereit".to_string(),
             online: false,
-            current_temp: None,
+            last_refresh: Instant::now() - REFRESH_INTERVAL,
         }
     }
 
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), Box<dyn Error>> {
-        self.refresh().await;
-
         while !self.exit {
+            if self.last_refresh.elapsed() >= REFRESH_INTERVAL {
+                self.refresh().await;
+                self.last_refresh = Instant::now();
+            }
+
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events().await?;
         }
@@ -80,19 +86,15 @@ impl App {
     async fn refresh(&mut self) {
         self.online = self.oven.is_online().await;
 
-        if self.online {
-            println!("Ofen ist online");
-        } else {
-            panic!("Ofen ist nicht online. Bitte überprüfen Sie die IP-Adresse und die Netzwerkverbindung.");
+        if let Ok(v) = self.oven.read_temp1().await {
+            self.temp.set_current(v as f32);
         }
-
         if let Ok(v) = self.oven.read_flap().await {
-            self.flap.value = v as f32;
+            self.flap.set_current(v as f32);
         }
         if let Ok(v) = self.oven.read_fan().await {
-            self.fan.value = v as f32;
+            self.fan.set_current(v as f32);
         }
-        self.current_temp = self.oven.read_temp1().await.ok();
     }
 
     fn layout(&self, frame: &Frame) -> [Rect; 4] {
@@ -122,13 +124,11 @@ impl App {
         frame.render_widget(&self.fan, tiles[2]);
 
         let info = format!(
-            "Ofen: {} ({})\nIst-Temperatur: {}\n\n{}\n\nTab: Kachel wechseln\n↵: Wert senden, r: aktualisieren",
+            "Ofen: {} ({})\n\n{}\n\nTab: Kachel wechseln\n↵: Soll-Wert senden\n(Auto-Refresh alle {}s)",
             self.oven_ip,
             if self.online { "online" } else { "offline" },
-            self.current_temp
-                .map(|t| format!("{t:.1} °C"))
-                .unwrap_or_else(|| "–".to_string()),
             self.status,
+            REFRESH_INTERVAL.as_secs(),
         );
 
         let block = Block::default().title("Status").borders(Borders::ALL);
@@ -139,7 +139,7 @@ impl App {
     }
 
     async fn handle_events(&mut self) -> Result<(), Box<dyn Error>> {
-        if event::poll(std::time::Duration::from_millis(200))? {
+        if event::poll(Duration::from_millis(200))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind != KeyEventKind::Press {
                     return Ok(());
@@ -151,7 +151,6 @@ impl App {
                     KeyCode::Up => self.focused_widget_mut().increase(),
                     KeyCode::Down => self.focused_widget_mut().decrease(),
                     KeyCode::Enter => self.send_current_value().await,
-                    KeyCode::Char('r') => self.refresh().await,
                     _ => {}
                 }
             }
@@ -184,5 +183,8 @@ impl App {
             Ok(v) => format!("Übernommen: {v:.1}"),
             Err(e) => format!("Fehler: {e}"),
         };
+
+        self.refresh().await;
+        self.last_refresh = Instant::now();
     }
 }
