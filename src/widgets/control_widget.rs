@@ -79,36 +79,32 @@ impl Widget for &ControlWidget {
             Span::styled("Soll: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{:.1} {}", self.value, self.unit),
-                Style::default().add_modifier(Modifier::BOLD).fg(
-                    if self.selected { Color::Cyan } else { Color::White },
-                ),
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(if self.selected {
+                        Color::Cyan
+                    } else {
+                        Color::White
+                    }),
             ),
         ])
         .alignment(Alignment::Center);
 
-        let ratio = (self.value - self.min) / (self.max - self.min);
-        let bar_width = inner.width.saturating_sub(2) as usize;
+        let ratio = ((self.value - self.min) / (self.max - self.min)).clamp(0.0, 1.0);
+
+        let bar_width = inner.width.saturating_sub(4) as usize;
         let filled = (bar_width as f32 * ratio).round() as usize;
-        let bar = format!(
-            "[{}{}]",
-            "#".repeat(filled),
-            "-".repeat(bar_width.saturating_sub(filled))
-        );
-        let bar_line = Line::from(Span::styled(bar, Style::default())).alignment(Alignment::Center);
+        let bar = format!("[{}{}]", "#".repeat(filled), "-".repeat(bar_width - filled));
+        let bar_line = Line::from(vec![
+            Span::styled("-", Style::default()),
+            Span::styled(bar, Style::default()),
+            Span::styled("+", Style::default()),
+        ]);
 
-        let hint_line = if self.selected {
-            Line::from("↑/↓ ändern, ↵ senden")
-        } else {
-            Line::from("Tab zum Auswählen")
-        }
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::DarkGray));
-
-        let lines: [(&Line, bool); 4] = [
+        let lines: [(&Line, bool); 3] = [
             (&current_line, true),
             (&target_line, true),
             (&bar_line, inner.height >= 3),
-            (&hint_line, inner.height >= 4),
         ];
 
         let visible: Vec<&Line> = lines

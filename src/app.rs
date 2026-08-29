@@ -53,7 +53,7 @@ pub struct App {
 
 impl App {
     pub fn new(oven_ip: String) -> Self {
-        let mut temp = ControlWidget::new("Solltemperatur", 21.0, "°C", 0.5, 5.0, 35.0);
+        let mut temp = ControlWidget::new("Temperatur [0]", 21.0, "°C", 0.5, 5.0, 300.0);
         temp.select(); // Fokus startet auf der Temperatur-Kachel
 
         Self {
@@ -61,8 +61,8 @@ impl App {
             oven_ip,
             exit: false,
             temp,
-            flap: ControlWidget::new("Klappe", 0.0, "%", 5.0, 0.0, 100.0),
-            fan: ControlWidget::new("Lüfter", 0.0, "%", 5.0, 0.0, 100.0),
+            flap: ControlWidget::new("Klappe [1]", 0.0, "%", 1.0, 0.0, 100.0),
+            fan: ControlWidget::new("Lüfter [2]", 0.0, "%", 1.0, 0.0, 100.0),
             focus: Focus::Temp,
             status: "Bereit".to_string(),
             online: false,
@@ -132,9 +132,14 @@ impl App {
         );
 
         let block = Block::default().title("Status").borders(Borders::ALL);
-        let paragraph = Paragraph::new(info)
-            .block(block)
-            .style(Style::default().fg(if self.online { Color::Green } else { Color::Red }));
+        let paragraph =
+            Paragraph::new(info)
+                .block(block)
+                .style(Style::default().fg(if self.online {
+                    Color::Green
+                } else {
+                    Color::Red
+                }));
         frame.render_widget(paragraph, tiles[3]);
     }
 
@@ -149,8 +154,15 @@ impl App {
                     KeyCode::Tab => self.change_focus(self.focus.next()),
                     KeyCode::BackTab => self.change_focus(self.focus.prev()),
                     KeyCode::Up => self.focused_widget_mut().increase(),
+                    KeyCode::Right => self.focused_widget_mut().increase(),
+                    KeyCode::Char('+') => self.focused_widget_mut().increase(),
+                    KeyCode::Char('-') => self.focused_widget_mut().decrease(),
+                    KeyCode::Left => self.focused_widget_mut().decrease(),
                     KeyCode::Down => self.focused_widget_mut().decrease(),
                     KeyCode::Enter => self.send_current_value().await,
+                    KeyCode::Char('0') => self.change_focus(Focus::Temp),
+                    KeyCode::Char('1') => self.change_focus(Focus::Flap),
+                    KeyCode::Char('2') => self.change_focus(Focus::Fan),
                     _ => {}
                 }
             }
