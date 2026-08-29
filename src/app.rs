@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use ratatui::{
     DefaultTerminal, Frame,
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
 };
@@ -53,6 +53,9 @@ pub struct App {
     last_refresh: Instant,
 }
 
+const MIN_WIDTH: u16 = 60;
+const MIN_HEIGHT: u16 = 20;
+
 impl App {
     pub fn new(oven_ip: String) -> Self {
         let mut temp = ControlWidget::new("Temperature [0]", 20.0, "°C", 0.5, 20.0, 300.0);
@@ -99,7 +102,8 @@ impl App {
             self.fan.set_current(v as f32);
         }
 
-        self.graph.push_sample(self.temp.current, self.oven.read_set_temp().await.unwrap());
+        self.graph
+            .push_sample(self.temp.current, self.oven.read_set_temp().await.unwrap());
     }
 
     fn layout(&self, frame: &Frame) -> [Rect; 5] {
@@ -110,15 +114,9 @@ impl App {
 
         let side_bar = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Fill(1),
-                    Constraint::Length(3),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Fill(1), Constraint::Length(3)].as_ref())
             .split(horizontal[0]);
-        
+
         let control_widgets = Layout::default()
             .direction(Direction::Vertical)
             .constraints(
@@ -131,10 +129,36 @@ impl App {
             )
             .split(side_bar[0]);
 
-        [control_widgets[0], control_widgets[1], control_widgets[2], side_bar[1], horizontal[1]]
+        [
+            control_widgets[0],
+            control_widgets[1],
+            control_widgets[2],
+            side_bar[1],
+            horizontal[1],
+        ]
     }
 
+    fn draw_too_small_warning(&self, frame: &mut Frame, area: Rect) {
+        let text = format!(
+            "Terminal Window to small!\nMin {}x{} needed,\ncurrent {}x{}.",
+            MIN_WIDTH, MIN_HEIGHT, area.width, area.height
+        );
+
+        let paragraph = Paragraph::new(text)
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Red))
+            .block(Block::default().borders(Borders::ALL));
+
+        frame.render_widget(paragraph, area);
+    }
     fn draw(&self, frame: &mut Frame) {
+        let area = frame.area();
+
+        if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
+            self.draw_too_small_warning(frame, area);
+            return;
+        }
+
         let tiles = self.layout(frame);
 
         frame.render_widget(&self.temp, tiles[0]);

@@ -43,17 +43,14 @@ impl GraphWidget {
             self.target_history.pop_front();
         }
 
-        self.current_history.push_back((self.next_x, current as f64));
+        self.current_history
+            .push_back((self.next_x, current as f64));
         self.target_history.push_back((self.next_x, target as f64));
         self.next_x += 1.0;
     }
 
     fn x_bounds(&self) -> [f64; 2] {
-        let min_x = self
-            .current_history
-            .front()
-            .map(|(x, _)| *x)
-            .unwrap_or(0.0);
+        let min_x = self.current_history.front().map(|(x, _)| *x).unwrap_or(0.0);
         let max_x = self.next_x.max(min_x + 1.0);
         [min_x, max_x]
     }
@@ -65,7 +62,6 @@ impl Widget for &GraphWidget {
             .title(self.title.clone())
             .borders(Borders::ALL)
             .style(Style::default());
-
 
         let current_data: Vec<(f64, f64)> = self.current_history.iter().copied().collect();
         let target_data: Vec<(f64, f64)> = self.target_history.iter().copied().collect();
@@ -81,7 +77,11 @@ impl Widget for &GraphWidget {
                 .name("target")
                 .marker(symbols::Marker::Braille)
                 .graph_type(GraphType::Line)
-                .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                .style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
                 .data(&target_data),
         ];
 
