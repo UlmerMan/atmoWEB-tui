@@ -48,7 +48,6 @@ pub struct App {
     fan: ControlWidget,
     graph: GraphWidget,
     focus: Focus,
-    status: String,
     online: bool,
     last_refresh: Instant,
 }
@@ -70,7 +69,6 @@ impl App {
             fan: ControlWidget::new("Fan [2]", 0.0, "%", 1.0, 0.0, 100.0),
             graph: GraphWidget::new("Temperature Curve", "°C", 0.0, 300.0),
             focus: Focus::Temp,
-            status: "Bereit".to_string(),
             online: false,
             last_refresh: Instant::now() - REFRESH_INTERVAL,
         }
@@ -231,11 +229,6 @@ impl App {
             Focus::Temp => self.oven.set_temp(self.temp.value).await.map(f64::from),
             Focus::Flap => self.oven.set_flap(self.flap.value as f64).await,
             Focus::Fan => self.oven.set_fan(self.fan.value as f64).await,
-        };
-
-        self.status = match result {
-            Ok(v) => format!("Übernommen: {v:.1}"),
-            Err(e) => format!("Fehler: {e}"),
         };
 
         self.refresh().await;
