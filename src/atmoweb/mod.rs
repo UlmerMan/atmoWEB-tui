@@ -3,6 +3,7 @@ use std::error::Error;
 use reqwest::Client;
 use serde_json::Value;
 
+#[derive(Debug)]
 pub struct AtmoWeb {
     ip_address: String,
     client: Client,
@@ -11,7 +12,7 @@ pub struct AtmoWeb {
 impl AtmoWeb {
     pub fn new(ip_address: impl Into<String>) -> Self {
         AtmoWeb {
-            ip_address:ip_address.into(),
+            ip_address: ip_address.into(),
             client: Client::new(),
         }
     }
@@ -20,12 +21,10 @@ impl AtmoWeb {
         let url = format!("http://{}/atmoweb?SN=", self.ip_address);
 
         match self.client.get(&url).send().await {
-            Ok(resp) if resp.status().is_success() => {
-                match resp.text().await {
-                    Ok(text) => !text.trim().is_empty(),
-                    Err(_) => false,
-                }
-            }
+            Ok(resp) if resp.status().is_success() => match resp.text().await {
+                Ok(text) => !text.trim().is_empty(),
+                Err(_) => false,
+            },
             _ => false,
         }
     }
@@ -40,7 +39,7 @@ impl AtmoWeb {
             .map(|(k, v)| format!("{}={}", k, v.unwrap_or("")))
             .collect::<Vec<_>>()
             .join("&");
-        
+
         let url = format!("http://{}/atmoweb?{}", self.ip_address, query_string);
         let resp = self.client.get(&url).send().await?;
         let text = resp.text().await?;
@@ -56,9 +55,8 @@ impl AtmoWeb {
         let val = celsius.to_string();
         let resp = self.query(&[("TempSet", Some(val.as_str()))]).await?;
         Ok(resp["TempSet"].as_f64().unwrap() as f32)
-    
     }
- 
+
     pub async fn read_temp1(&self) -> Result<f64, Box<dyn Error>> {
         let resp = self.query(&[("Temp1Read", None)]).await?;
         Ok(resp["Temp1Read"].as_f64().unwrap())
@@ -85,5 +83,4 @@ impl AtmoWeb {
         let resp = self.query(&[("FanSet", Some(val.as_str()))]).await?;
         Ok(resp["FanSet"].as_f64().unwrap())
     }
-
 }
