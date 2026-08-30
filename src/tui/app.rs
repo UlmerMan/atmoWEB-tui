@@ -225,7 +225,7 @@ impl App {
     }
 
     async fn send_current_value(&mut self) {
-        let result = match self.focus {
+        let _ = match self.focus {
             Focus::Temp => self.oven.set_temp(self.temp.value).await.map(f64::from),
             Focus::Flap => self.oven.set_flap(self.flap.value as f64).await,
             Focus::Fan => self.oven.set_fan(self.fan.value as f64).await,

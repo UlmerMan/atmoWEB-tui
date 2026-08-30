@@ -1,5 +1,5 @@
-use atmoweb_tui::app::App;
 use atmoweb_tui::cli;
+use atmoweb_tui::tui::app::App;
 
 use std::error::Error;
 
