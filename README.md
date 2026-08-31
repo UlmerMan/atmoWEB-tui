@@ -1,5 +1,9 @@
 # AtmoWeb TUI
 
+[![Crates.io](https://img.shields.io/crates/v/atmoweb-tui.svg)](https://crates.io/crates/atmoweb-tui)
+[![License: GPL-3.0](https://img.shields.io/crates/l/atmoweb-tui.svg)](https://github.com/UlmerMan/atmoWEB-tui/blob/main/LICENSE)
+[![CI](https://github.com/UlmerMan/atmoWEB-tui/actions/workflows/ci.yml/badge.svg)](https://github.com/UlmerMan/atmoWEB-tui/actions/workflows/ci.yml)
+
 A terminal UI (built with [ratatui](https://ratatui.rs)) for monitoring and controlling a memmert oven (tested with memmert un30) over the AtmoWeb web interface. It displays current and target values for temperature, flap position, and fan speed, refreshes automatically in the background, and lets you adjust target values directly from the keyboard.
 
 ## Features
@@ -25,9 +29,17 @@ Press **`m`** at any time to toggle between Manual and Auto modes.
 
 ## Installation
 
+### Via Cargo (crates.io)
+
 ```bash
-git clone <repo-url>
-cd atmoweb-tui
+cargo install atmoweb-tui
+```
+
+### From Source
+
+```bash
+git clone https://github.com/UlmerMan/atmoWEB-tui.git
+cd atmoWEB-tui
 cargo build --release
 ```
 
