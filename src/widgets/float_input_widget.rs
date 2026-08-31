@@ -2,58 +2,50 @@ use std::io::Error;
 
 use ratatui::{
     DefaultTerminal,
-    layout::Constraint,
-    layout::Layout,
+    layout::{Constraint, Layout},
     style::{Color, Style},
-    widgets::{Block, Borders},
+    widgets::{Block, Borders, Widget},
 };
 
 use ratatui_textarea::{Input, Key, TextArea};
 
-fn validate(textarea: &mut TextArea) -> bool {
-    if let Err(err) = textarea.lines()[0].parse::<f64>() {
-        textarea.set_style(Style::default().fg(Color::LightRed));
-        textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Color::LightRed)
-                .title(format!("ERROR: {}", err)),
-        );
-        false
-    } else {
-        textarea.set_style(Style::default().fg(Color::LightGreen));
-        textarea.set_block(
-            Block::default()
-                .border_style(Color::LightGreen)
-                .borders(Borders::ALL)
-                .title("OK"),
-        );
-        true
+pub enum FloatInput<T> {
+    Some(T),
+    None,
+    Abort,
+}
+
+pub struct FloatInputWidget<'a> {
+    textarea: TextArea<'a>,
+    is_valid: bool,
+}
+
+impl<'a> Default for FloatInputWidget<'a> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-pub fn float_input_widget(
-    terminal: &mut DefaultTerminal,
-) -> Result<f32, Box<dyn std::error::Error>> {
-    let mut textarea = TextArea::default();
-    textarea.set_cursor_line_style(Style::default());
-    textarea.set_placeholder_text("Enter a valid float (e.g. 1.56)");
-    let layout = Layout::default().constraints([Constraint::Length(3), Constraint::Min(1)]);
-    let mut is_valid = validate(&mut textarea);
+impl<'a> FloatInputWidget<'a> {
+    pub fn new() -> Self {
+        let mut textarea = TextArea::default();
+        textarea.set_cursor_line_style(Style::default());
+        textarea.set_placeholder_text("Enter a valid float (e.g. 1.56)");
+        let is_valid = false;
 
-    loop {
-        terminal.draw(|f| {
-            let chunks = layout.split(f.area());
-            f.render_widget(&textarea, chunks[0]);
-        })?;
+        let mut float_widget = Self { textarea, is_valid };
+        let _ = float_widget.validate();
+        float_widget
+    }
 
-        match crossterm::event::read()?.into() {
-            Input { key: Key::Esc, .. } => {
-                Err(Error::new(std::io::ErrorKind::InvalidInput, "User cancelled input"))?
-            }
+    pub fn handle_input(&mut self, input: Input) -> FloatInput<f32> {
+        match input {
+            Input { key: Key::Esc, .. } => FloatInput::Abort,
             Input {
                 key: Key::Enter, ..
-            } if is_valid => return Ok(textarea.lines()[0].parse::<f32>().unwrap()),
+            } if self.is_valid => {
+                FloatInput::Some(self.textarea.lines()[0].parse::<f32>().unwrap())
+            }
             Input {
                 key: Key::Char('m'),
                 ctrl: true,
@@ -61,13 +53,43 @@ pub fn float_input_widget(
             }
             | Input {
                 key: Key::Enter, ..
-            } => {}
-            input => {
-                // TextArea::input returns if the input modified its text
-                if textarea.input(input) {
-                    is_valid = validate(&mut textarea);
+            } => FloatInput::None,
+            _ => {
+                if self.textarea.input(input) {
+                    self.is_valid = self.validate();
                 }
+                FloatInput::None
             }
         }
+    }
+
+    fn validate(&mut self) -> bool {
+        if let Err(err) = self.textarea.lines()[0].parse::<f64>() {
+            self.textarea
+                .set_style(Style::default().fg(Color::LightRed));
+            self.textarea.set_block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Color::LightRed)
+                    .title(format!("ERROR: {}", err)),
+            );
+            false
+        } else {
+            self.textarea
+                .set_style(Style::default().fg(Color::LightGreen));
+            self.textarea.set_block(
+                Block::default()
+                    .border_style(Color::LightGreen)
+                    .borders(Borders::ALL)
+                    .title("OK"),
+            );
+            true
+        }
+    }
+}
+
+impl Widget for &FloatInputWidget<'_> {
+    fn render(self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer) {
+        self.textarea.render(area, buf);
     }
 }

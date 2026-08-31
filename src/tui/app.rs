@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::time::{Duration, Instant};
 
+use ratatui::layout;
 use ratatui::{
     DefaultTerminal, Frame,
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
@@ -8,9 +9,12 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
 };
+use serde_json::value;
 
 use crate::atmoweb::AtmoWeb;
 use crate::widgets::control_widget::ControlWidget;
+use crate::widgets::float_input_widget::FloatInput;
+use crate::widgets::float_input_widget::FloatInputWidget;
 use crate::widgets::graph_widget::GraphWidget;
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(2);
@@ -82,20 +86,48 @@ impl App {
                 self.refresh().await;
                 self.last_refresh = Instant::now();
             }
-            
+
+            terminal.draw(|frame| self.draw(frame))?;
+
+            let mut input_widget = FloatInputWidget::default();
             if self.editing {
-                if let Ok(value) = crate::widgets::float_input_widget::float_input_widget(
-                    terminal,
-                ) {
-                    self.focused_widget_mut().set_target(value);
+                while !self.exit {
+                    if self.last_refresh.elapsed() >= REFRESH_INTERVAL {
+                        self.refresh().await;
+                        self.last_refresh = Instant::now();
+                    }
+
+                    if self.editing {
+                        while self.editing {
+                            terminal.draw(|frame| {
+                                self.draw(frame);
+
+                                let popup = self.layout_centered_box(frame);
+
+                                frame.render_widget(ratatui::widgets::Clear, popup);
+
+                                frame.render_widget(&input_widget, popup);
+                            })?;
+
+                            match input_widget.handle_input(crossterm::event::read()?.into()) {
+                                FloatInput::Some(value) => {
+                                    self.focused_widget_mut().set_target(value);
+                                    self.editing = false;
+                                }
+                                FloatInput::Abort => {
+                                    self.editing = false;
+                                }
+                                _ => {}
+                            }
+                        }
+                    } else {
+                        terminal.draw(|frame| self.draw(frame))?;
+                        self.handle_events().await?;
+                    }
                 }
-                self.editing = false;
-                
-                self.send_current_value().await;
             } else {
-                terminal.draw(|frame| self.draw(frame))?;
                 self.handle_events().await?;
-            }    
+            }
         }
         Ok(())
     }
@@ -147,6 +179,30 @@ impl App {
             side_bar[1],
             horizontal[1],
         ]
+    }
+
+    fn layout_centered_box(&self, frame: &Frame) -> Rect {
+        let area = frame.area();
+
+        let vertical = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(3),
+                Constraint::Fill(1),
+            ])
+            .split(area);
+
+        let horizontal = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(60),
+                Constraint::Fill(1),
+            ])
+            .split(vertical[1]);
+
+        horizontal[1]
     }
 
     fn draw_too_small_warning(&self, frame: &mut Frame, area: Rect) {
