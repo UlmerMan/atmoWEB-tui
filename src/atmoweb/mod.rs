@@ -3,6 +3,8 @@ use std::error::Error;
 use reqwest::Client;
 use serde_json::Value;
 
+use std::time::Duration;
+
 #[derive(Debug)]
 pub struct AtmoWeb {
     ip_address: String,
@@ -11,9 +13,16 @@ pub struct AtmoWeb {
 
 impl AtmoWeb {
     pub fn new(ip_address: impl Into<String>) -> Self {
+        // ponytail: short connect and total timeouts prevent UI loop stalls on invalid IP
+        let client = Client::builder()
+            .connect_timeout(Duration::from_millis(800))
+            .timeout(Duration::from_millis(1500))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+
         AtmoWeb {
             ip_address: ip_address.into(),
-            client: Client::new(),
+            client,
         }
     }
 

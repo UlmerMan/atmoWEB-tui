@@ -2,6 +2,12 @@
 use crate::widgets::float_input_widget::FloatInputWidget;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppState {
+    Connecting,
+    Running,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppMode {
     Manual,
     Auto,
@@ -49,7 +55,7 @@ pub enum RightView {
 
 pub enum InputState {
     Normal,
-    Editing(FloatInputWidget<'static>),
+    Editing(Box<FloatInputWidget<'static>>),
 }
 
 #[cfg(test)]
@@ -71,6 +77,13 @@ mod tests {
         assert_eq!(ManualFocus::Temp.prev(), ManualFocus::Fan);
         assert_eq!(ManualFocus::Fan.prev(), ManualFocus::Flap);
         assert_eq!(ManualFocus::Flap.prev(), ManualFocus::Temp);
+    }
+
+    #[test]
+    fn test_app_state() {
+        let state = AppState::Connecting;
+        assert_eq!(state, AppState::Connecting);
+        assert_ne!(state, AppState::Running);
     }
 }
 

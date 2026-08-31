@@ -1,13 +1,24 @@
 use std::error::Error;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::tui::app::App;
-use crate::tui::state::{AppMode, InputState, ManualFocus};
+use crate::tui::state::{AppMode, AppState, InputState, ManualFocus};
 use crate::widgets::float_input_widget::{FloatInput, FloatInputWidget};
 
 pub async fn handle_key(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
     if key.kind != KeyEventKind::Press {
+        return Ok(());
+    }
+
+    // 0. Handle Connecting state early exit
+    if app.state == AppState::Connecting {
+        if key.code == KeyCode::Char('q')
+            || key.code == KeyCode::Esc
+            || (key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c'))
+        {
+            app.exit = true;
+        }
         return Ok(());
     }
 
@@ -18,7 +29,6 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Erro
                 match app.mode {
                     AppMode::Manual => {
                         app.focused_control_mut().set_target(val);
-                        app.send_current_value().await;
                     }
                     AppMode::Auto => {
                         app.curve.set_selected_temp(val);
@@ -49,7 +59,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Erro
             return Ok(());
         }
         KeyCode::Char('e') => {
-            app.input_state = InputState::Editing(FloatInputWidget::new());
+            app.input_state = InputState::Editing(Box::new(FloatInputWidget::new()));
             return Ok(());
         }
         _ => {}

@@ -10,6 +10,7 @@ pub struct ControlWidget {
     pub title: String,
     pub current: f32,
     pub value: f32,
+    pub applied_value: f32,
     pub unit: String,
     pub step: f32,
     pub min: f32,
@@ -24,6 +25,7 @@ impl ControlWidget {
             title: title.to_string(),
             current: start,
             value: start,
+            applied_value: start,
             unit: unit.to_string(),
             step,
             min,
@@ -45,6 +47,22 @@ impl ControlWidget {
         self.locked = locked;
         if locked {
             self.selected = false;
+        }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        (self.value - self.applied_value).abs() > 0.001
+    }
+
+    pub fn mark_applied(&mut self) {
+        self.applied_value = self.value;
+    }
+
+    pub fn sync_applied(&mut self, val: f32) {
+        let clean = !self.is_dirty();
+        self.applied_value = val.clamp(self.min, self.max);
+        if clean {
+            self.value = self.applied_value;
         }
     }
 
@@ -77,18 +95,32 @@ impl Widget for &ControlWidget {
             format!(" {} ", self.title)
         };
 
+        let is_dirty = self.is_dirty();
+
         let block_style = if self.locked {
             Style::default().fg(Color::DarkGray)
+        } else if is_dirty {
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
         } else if self.selected {
             Style::default().fg(Color::Cyan)
         } else {
             Style::default()
         };
 
-        let block = Block::default()
+        let mut block = Block::default()
             .title(title_text)
             .borders(Borders::ALL)
             .style(block_style);
+
+        if is_dirty && !self.locked {
+            block = block.title_top(
+                Line::from(Span::styled(
+                    " [ ENTER ] to apply ",
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                ))
+                .alignment(Alignment::Right),
+            );
+        }
 
         let inner = block.inner(area);
         block.render(area, buf);
@@ -108,6 +140,10 @@ impl Widget for &ControlWidget {
 
         let target_style = if self.locked {
             Style::default().fg(Color::DarkGray)
+        } else if is_dirty {
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::Yellow)
         } else if self.selected {
             Style::default()
                 .add_modifier(Modifier::BOLD)
@@ -131,6 +167,8 @@ impl Widget for &ControlWidget {
         let bar = format!("[{}{}]", "#".repeat(filled), "-".repeat(bar_width - filled));
         let bar_style = if self.locked {
             Style::default().fg(Color::DarkGray)
+        } else if is_dirty {
+            Style::default().fg(Color::Yellow)
         } else {
             Style::default()
         };
@@ -188,6 +226,41 @@ mod tests {
         widget.set_locked(false);
         widget.decrease();
         assert_eq!(widget.value, 100.0);
+    }
+
+    #[test]
+    fn test_dirty_state_and_apply() {
+        let mut widget = ControlWidget::new("Temp", 100.0, "°C", 5.0, 20.0, 300.0);
+        assert!(!widget.is_dirty());
+
+        widget.increase();
+        assert_eq!(widget.value, 105.0);
+        assert!(widget.is_dirty());
+
+        widget.decrease();
+        assert_eq!(widget.value, 100.0);
+        assert!(!widget.is_dirty());
+
+        widget.increase();
+        assert!(widget.is_dirty());
+        widget.mark_applied();
+        assert!(!widget.is_dirty());
+        assert_eq!(widget.applied_value, 105.0);
+
+        // sync_applied when clean should update both
+        widget.sync_applied(120.0);
+        assert_eq!(widget.value, 120.0);
+        assert_eq!(widget.applied_value, 120.0);
+        assert!(!widget.is_dirty());
+
+        // sync_applied when dirty should not overwrite pending user edit
+        widget.increase();
+        assert_eq!(widget.value, 125.0);
+        assert!(widget.is_dirty());
+        widget.sync_applied(130.0);
+        assert_eq!(widget.value, 125.0);
+        assert_eq!(widget.applied_value, 130.0);
+        assert!(widget.is_dirty());
     }
 }
 
