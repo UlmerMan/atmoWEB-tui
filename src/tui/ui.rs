@@ -119,9 +119,9 @@ fn draw_too_small_warning(frame: &mut Frame, area: Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::backend::TestBackend;
-    use ratatui::Terminal;
     use crate::tui::state::AppMode;
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
 
     #[test]
     fn test_ui_renders_connecting_and_running() {

@@ -57,7 +57,9 @@ impl Widget for &HeaderWidget<'_> {
             Span::styled(hint_text, Style::default().fg(Color::DarkGray)),
         ]);
 
-        let mode_block = Block::default().borders(Borders::ALL).title(" System Mode ");
+        let mode_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" System Mode ");
         let mode_p = Paragraph::new(mode_line).block(mode_block);
         mode_p.render(chunks[0], buf);
 
@@ -72,9 +74,7 @@ impl Widget for &HeaderWidget<'_> {
         } else {
             Span::styled(
                 "○ OFFLINE",
-                Style::default()
-                    .fg(Color::Red)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             )
         };
 
@@ -85,7 +85,9 @@ impl Widget for &HeaderWidget<'_> {
             online_span,
         ]);
 
-        let status_block = Block::default().borders(Borders::ALL).title(" Oven Status ");
+        let status_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Oven Status ");
         let status_p = Paragraph::new(status_line)
             .alignment(Alignment::Right)
             .block(status_block);

@@ -86,4 +86,3 @@ mod tests {
         assert_ne!(state, AppState::Running);
     }
 }
-

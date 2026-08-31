@@ -100,7 +100,9 @@ impl Widget for &ControlWidget {
         let block_style = if self.locked {
             Style::default().fg(Color::DarkGray)
         } else if is_dirty {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
         } else if self.selected {
             Style::default().fg(Color::Cyan)
         } else {
@@ -116,7 +118,9 @@ impl Widget for &ControlWidget {
             block = block.title_top(
                 Line::from(Span::styled(
                     " [ ENTER ] to apply ",
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
                 ))
                 .alignment(Alignment::Right),
             );
@@ -263,4 +267,3 @@ mod tests {
         assert!(widget.is_dirty());
     }
 }
-

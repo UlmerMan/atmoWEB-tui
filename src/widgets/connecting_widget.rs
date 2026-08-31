@@ -32,11 +32,15 @@ impl Widget for &ConnectingWidget<'_> {
             Line::from(vec![
                 Span::styled(
                     format!("  {} ", spinner_glyph),
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     "Connecting to Memmert atmoWEB...",
-                    Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
                 ),
             ]),
             Line::from(""),
@@ -68,9 +72,7 @@ impl Widget for &ConnectingWidget<'_> {
             .border_type(BorderType::Rounded)
             .style(Style::default().fg(Color::Cyan));
 
-        let paragraph = Paragraph::new(lines)
-            .block(block)
-            .wrap(Wrap { trim: true });
+        let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: true });
 
         paragraph.render(area, buf);
     }

@@ -552,7 +552,12 @@ impl Widget for &CurveWidget {
             Span::raw("   "),
             total_time_span,
         ]);
-        buf.set_line(bottom_layout[0].x, bottom_layout[0].y, &status_line, bottom_layout[0].width);
+        buf.set_line(
+            bottom_layout[0].x,
+            bottom_layout[0].y,
+            &status_line,
+            bottom_layout[0].width,
+        );
 
         // 2. Point Table / Selected Point Card
         let header = Row::new(vec!["#", "Time", "Duration", "Target Temp", "Ramp Rate"])
@@ -614,7 +619,11 @@ impl Widget for &CurveWidget {
         } else {
             0
         };
-        let visible_rows: Vec<Row> = rows.into_iter().skip(start_row).take(visible_height).collect();
+        let visible_rows: Vec<Row> = rows
+            .into_iter()
+            .skip(start_row)
+            .take(visible_height)
+            .collect();
 
         let table = Table::new(
             visible_rows,
@@ -651,7 +660,12 @@ impl Widget for &CurveWidget {
         ])
         .alignment(Alignment::Left);
 
-        buf.set_line(bottom_layout[2].x, bottom_layout[2].y, &keybinds_line, bottom_layout[2].width);
+        buf.set_line(
+            bottom_layout[2].x,
+            bottom_layout[2].y,
+            &keybinds_line,
+            bottom_layout[2].width,
+        );
     }
 }
 

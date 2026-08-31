@@ -88,7 +88,8 @@ impl App {
 
                         if self.oven.is_online().await {
                             self.online = true;
-                            self.connect_status = "Connected! Fetching initial state...".to_string();
+                            self.connect_status =
+                                "Connected! Fetching initial state...".to_string();
                             self.initial_sync().await;
                             self.state = AppState::Running;
                             self.last_refresh = Instant::now();

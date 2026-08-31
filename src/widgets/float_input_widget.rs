@@ -1,4 +1,3 @@
-
 use ratatui::{
     style::{Color, Style},
     widgets::{Block, Borders, Widget},
