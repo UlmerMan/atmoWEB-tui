@@ -1,79 +1,60 @@
+// ponytail: minimal app coordinator with single non-blocking event loop
 use std::error::Error;
 use std::time::{Duration, Instant};
 
 use ratatui::{
-    DefaultTerminal, Frame,
-    crossterm::event::{self, Event, KeyCode, KeyEventKind},
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
-    widgets::{Block, Borders, Paragraph},
+    DefaultTerminal,
+    crossterm::event::{self, Event},
 };
 
 use crate::atmoweb::AtmoWeb;
+use crate::tui::handler;
+use crate::tui::state::{AppMode, InputState, ManualFocus, RightView};
+use crate::tui::ui;
 use crate::widgets::control_widget::ControlWidget;
-use crate::widgets::float_input_widget::FloatInput;
-use crate::widgets::float_input_widget::FloatInputWidget;
+use crate::widgets::curve_widget::CurveWidget;
 use crate::widgets::graph_widget::GraphWidget;
 
 const REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Focus {
-    Temp,
-    Flap,
-    Fan,
-}
-
-impl Focus {
-    fn next(self) -> Self {
-        match self {
-            Focus::Temp => Focus::Flap,
-            Focus::Flap => Focus::Fan,
-            Focus::Fan => Focus::Temp,
-        }
-    }
-    fn prev(self) -> Self {
-        match self {
-            Focus::Temp => Focus::Fan,
-            Focus::Flap => Focus::Temp,
-            Focus::Fan => Focus::Flap,
-        }
-    }
-}
-
 pub struct App {
-    oven: AtmoWeb,
-    oven_ip: String,
-    exit: bool,
-    temp: ControlWidget,
-    flap: ControlWidget,
-    fan: ControlWidget,
-    graph: GraphWidget,
-    focus: Focus,
-    online: bool,
-    editing: bool,
+    pub oven: AtmoWeb,
+    pub oven_ip: String,
+    pub exit: bool,
+    pub mode: AppMode,
+    pub manual_focus: ManualFocus,
+    pub input_state: InputState,
+    pub right_view: RightView,
+    pub online: bool,
+    pub temp: ControlWidget,
+    pub flap: ControlWidget,
+    pub fan: ControlWidget,
+    pub curve: CurveWidget,
+    pub graph: GraphWidget,
     last_refresh: Instant,
 }
-
-const MIN_WIDTH: u16 = 60;
-const MIN_HEIGHT: u16 = 20;
 
 impl App {
     pub fn new(oven_ip: String) -> Self {
         let mut temp = ControlWidget::new("Temperature [0]", 20.0, "°C", 0.5, 20.0, 300.0);
+        let flap = ControlWidget::new("Flap [1]", 0.0, "%", 1.0, 0.0, 100.0);
+        let fan = ControlWidget::new("Fan [2]", 0.0, "%", 1.0, 0.0, 100.0);
         temp.select();
 
         Self {
             oven: AtmoWeb::new(oven_ip.clone()),
             oven_ip,
             exit: false,
-            temp,
-            flap: ControlWidget::new("Flap [1]", 0.0, "%", 1.0, 0.0, 100.0),
-            fan: ControlWidget::new("Fan [2]", 0.0, "%", 1.0, 0.0, 100.0),
-            graph: GraphWidget::new("Temperature Curve", "°C", 0.0, 300.0),
-            focus: Focus::Temp,
+            mode: AppMode::Manual,
+            manual_focus: ManualFocus::Temp,
+            input_state: InputState::Normal,
+            right_view: RightView::LiveGraph,
             online: false,
-            editing: false,
+            temp,
+            flap,
+            fan,
+            curve: CurveWidget::new("Heating Curve", "°C", 20.0, 300.0),
+            graph: GraphWidget::new("Live Temperature History", "°C", 0.0, 300.0),
             last_refresh: Instant::now() - REFRESH_INTERVAL,
         }
     }
@@ -85,53 +66,18 @@ impl App {
                 self.last_refresh = Instant::now();
             }
 
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| ui::draw(self, frame))?;
 
-            let mut input_widget = FloatInputWidget::default();
-            if self.editing {
-                while !self.exit {
-                    if self.last_refresh.elapsed() >= REFRESH_INTERVAL {
-                        self.refresh().await;
-                        self.last_refresh = Instant::now();
-                    }
-
-                    if self.editing {
-                        while self.editing {
-                            terminal.draw(|frame| {
-                                self.draw(frame);
-
-                                let popup = self.layout_centered_box(frame);
-
-                                frame.render_widget(ratatui::widgets::Clear, popup);
-
-                                frame.render_widget(&input_widget, popup);
-                            })?;
-
-                            match input_widget.handle_input(crossterm::event::read()?.into()) {
-                                FloatInput::Some(value) => {
-                                    self.focused_widget_mut().set_target(value);
-                                    self.editing = false;
-                                }
-                                FloatInput::Abort => {
-                                    self.editing = false;
-                                }
-                                _ => {}
-                            }
-                        }
-                        self.send_current_value().await;
-                    } else {
-                        terminal.draw(|frame| self.draw(frame))?;
-                        self.handle_events().await?;
-                    }
+            if event::poll(Duration::from_millis(100))? {
+                if let Event::Key(key) = event::read()? {
+                    handler::handle_key(self, key).await?;
                 }
-            } else {
-                self.handle_events().await?;
             }
         }
         Ok(())
     }
 
-    async fn refresh(&mut self) {
+    pub async fn refresh(&mut self) {
         self.online = self.oven.is_online().await;
 
         if let Ok(v) = self.oven.read_temp1().await {
@@ -144,163 +90,84 @@ impl App {
             self.fan.set_current(v as f32);
         }
 
-        self.graph
-            .push_sample(self.temp.current, self.oven.read_set_temp().await.unwrap());
-    }
-
-    fn layout(&self, frame: &Frame) -> [Rect; 5] {
-        let horizontal = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
-            .split(frame.area());
-
-        let side_bar = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Fill(1), Constraint::Length(3)].as_ref())
-            .split(horizontal[0]);
-
-        let control_widgets = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Percentage(33),
-                    Constraint::Percentage(33),
-                    Constraint::Percentage(33),
-                ]
-                .as_ref(),
-            )
-            .split(side_bar[0]);
-
-        [
-            control_widgets[0],
-            control_widgets[1],
-            control_widgets[2],
-            side_bar[1],
-            horizontal[1],
-        ]
-    }
-
-    fn layout_centered_box(&self, frame: &Frame) -> Rect {
-        let area = frame.area();
-
-        let vertical = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Length(3),
-                Constraint::Fill(1),
-            ])
-            .split(area);
-
-        let horizontal = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Length(60),
-                Constraint::Fill(1),
-            ])
-            .split(vertical[1]);
-
-        horizontal[1]
-    }
-
-    fn draw_too_small_warning(&self, frame: &mut Frame, area: Rect) {
-        let text = format!(
-            "Terminal Window to small!\nMin {}x{} needed,\ncurrent {}x{}.",
-            MIN_WIDTH, MIN_HEIGHT, area.width, area.height
-        );
-
-        let paragraph = Paragraph::new(text)
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Red))
-            .block(Block::default().borders(Borders::ALL));
-
-        frame.render_widget(paragraph, area);
-    }
-    fn draw(&self, frame: &mut Frame) {
-        let area = frame.area();
-
-        if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
-            self.draw_too_small_warning(frame, area);
-            return;
-        }
-
-        let tiles = self.layout(frame);
-
-        frame.render_widget(&self.temp, tiles[0]);
-        frame.render_widget(&self.flap, tiles[1]);
-        frame.render_widget(&self.fan, tiles[2]);
-
-        let info = format!(
-            "Ofen: {} ({})",
-            self.oven_ip,
-            if self.online { "online" } else { "offline" }
-        );
-
-        let block = Block::default().title("Status").borders(Borders::ALL);
-        let paragraph =
-            Paragraph::new(info)
-                .block(block)
-                .style(Style::default().fg(if self.online {
-                    Color::Green
-                } else {
-                    Color::Red
-                }));
-        frame.render_widget(paragraph, tiles[3]);
-
-        frame.render_widget(&self.graph, tiles[4]);
-    }
-
-    async fn handle_events(&mut self) -> Result<(), Box<dyn Error>> {
-        if event::poll(Duration::from_millis(200))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    return Ok(());
-                }
-                match key.code {
-                    KeyCode::Char('q') => self.exit = true,
-                    KeyCode::Tab => self.change_focus(self.focus.next()),
-                    KeyCode::BackTab => self.change_focus(self.focus.prev()),
-                    KeyCode::Up => self.focused_widget_mut().increase(),
-                    KeyCode::Right => self.focused_widget_mut().increase(),
-                    KeyCode::Char('+') => self.focused_widget_mut().increase(),
-                    KeyCode::Char('-') => self.focused_widget_mut().decrease(),
-                    KeyCode::Left => self.focused_widget_mut().decrease(),
-                    KeyCode::Down => self.focused_widget_mut().decrease(),
-                    KeyCode::Enter => self.send_current_value().await,
-                    KeyCode::Char('0') => self.change_focus(Focus::Temp),
-                    KeyCode::Char('1') => self.change_focus(Focus::Flap),
-                    KeyCode::Char('2') => self.change_focus(Focus::Fan),
-                    KeyCode::Char('e') => self.editing = true,
-                    _ => {}
-                }
+        // Auto Mode curve execution: step target temperature non-blocking
+        if self.mode == AppMode::Auto {
+            if let Some(target_temp) = self.curve.poll_runner() {
+                self.temp.set_target(target_temp);
+                let _ = self.oven.set_temp(target_temp).await;
             }
         }
-        Ok(())
-    }
 
-    fn change_focus(&mut self, new_focus: Focus) {
-        self.focused_widget_mut().deselect();
-        self.focus = new_focus;
-        self.focused_widget_mut().select();
-    }
-
-    fn focused_widget_mut(&mut self) -> &mut ControlWidget {
-        match self.focus {
-            Focus::Temp => &mut self.temp,
-            Focus::Flap => &mut self.flap,
-            Focus::Fan => &mut self.fan,
+        if let Ok(set_temp) = self.oven.read_set_temp().await {
+            self.graph.push_sample(self.temp.current, set_temp);
         }
     }
 
-    async fn send_current_value(&mut self) {
-        let _ = match self.focus {
-            Focus::Temp => self.oven.set_temp(self.temp.value).await.map(f64::from),
-            Focus::Flap => self.oven.set_flap(self.flap.value as f64).await,
-            Focus::Fan => self.oven.set_fan(self.fan.value as f64).await,
-        };
+    pub fn toggle_mode(&mut self) {
+        self.set_mode(self.mode.toggle());
+    }
 
-        self.refresh().await;
-        self.last_refresh = Instant::now();
+    pub fn set_mode(&mut self, mode: AppMode) {
+        self.mode = mode;
+        match self.mode {
+            AppMode::Manual => {
+                self.temp.set_locked(false);
+                self.flap.set_locked(false);
+                self.fan.set_locked(false);
+                self.curve.deselect();
+                self.right_view = RightView::LiveGraph;
+                self.apply_manual_focus();
+            }
+            AppMode::Auto => {
+                self.temp.set_locked(true);
+                self.flap.set_locked(true);
+                self.fan.set_locked(true);
+                self.curve.select();
+                self.right_view = RightView::Curve;
+            }
+        }
+    }
+
+    pub fn toggle_right_view(&mut self) {
+        self.right_view = match self.right_view {
+            RightView::Curve => RightView::LiveGraph,
+            RightView::LiveGraph => RightView::Curve,
+        };
+    }
+
+    pub fn change_manual_focus(&mut self, new_focus: ManualFocus) {
+        self.manual_focus = new_focus;
+        self.apply_manual_focus();
+    }
+
+    fn apply_manual_focus(&mut self) {
+        self.temp.deselect();
+        self.flap.deselect();
+        self.fan.deselect();
+        match self.manual_focus {
+            ManualFocus::Temp => self.temp.select(),
+            ManualFocus::Flap => self.flap.select(),
+            ManualFocus::Fan => self.fan.select(),
+        }
+    }
+
+    pub fn focused_control_mut(&mut self) -> &mut ControlWidget {
+        match self.manual_focus {
+            ManualFocus::Temp => &mut self.temp,
+            ManualFocus::Flap => &mut self.flap,
+            ManualFocus::Fan => &mut self.fan,
+        }
+    }
+
+    pub async fn send_current_value(&mut self) {
+        if self.mode == AppMode::Manual {
+            let _ = match self.manual_focus {
+                ManualFocus::Temp => self.oven.set_temp(self.temp.value).await.map(f64::from),
+                ManualFocus::Flap => self.oven.set_flap(self.flap.value as f64).await,
+                ManualFocus::Fan => self.oven.set_fan(self.fan.value as f64).await,
+            };
+            self.refresh().await;
+            self.last_refresh = Instant::now();
+        }
     }
 }

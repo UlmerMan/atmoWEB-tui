@@ -15,6 +15,7 @@ pub struct ControlWidget {
     pub min: f32,
     pub max: f32,
     pub selected: bool,
+    pub locked: bool,
 }
 
 impl ControlWidget {
@@ -28,6 +29,7 @@ impl ControlWidget {
             min,
             max,
             selected: false,
+            locked: false,
         }
     }
 
@@ -39,12 +41,23 @@ impl ControlWidget {
         self.selected = false;
     }
 
+    pub fn set_locked(&mut self, locked: bool) {
+        self.locked = locked;
+        if locked {
+            self.selected = false;
+        }
+    }
+
     pub fn increase(&mut self) {
-        self.value = (self.value + self.step).min(self.max);
+        if !self.locked {
+            self.value = (self.value + self.step).min(self.max);
+        }
     }
 
     pub fn decrease(&mut self) {
-        self.value = (self.value - self.step).max(self.min);
+        if !self.locked {
+            self.value = (self.value - self.step).max(self.min);
+        }
     }
 
     pub fn set_current(&mut self, current: f32) {
@@ -58,14 +71,24 @@ impl ControlWidget {
 
 impl Widget for &ControlWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let title_text = if self.locked {
+            format!(" {} [LOCKED] ", self.title)
+        } else {
+            format!(" {} ", self.title)
+        };
+
+        let block_style = if self.locked {
+            Style::default().fg(Color::DarkGray)
+        } else if self.selected {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default()
+        };
+
         let block = Block::default()
-            .title(self.title.clone())
+            .title(title_text)
             .borders(Borders::ALL)
-            .style(if self.selected {
-                Style::default().fg(Color::Cyan)
-            } else {
-                Style::default()
-            });
+            .style(block_style);
 
         let inner = block.inner(area);
         block.render(area, buf);
@@ -74,23 +97,30 @@ impl Widget for &ControlWidget {
             Span::styled("current:  ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{:.1} {}", self.current, self.unit),
-                Style::default(),
+                if self.locked {
+                    Style::default().fg(Color::DarkGray)
+                } else {
+                    Style::default()
+                },
             ),
         ])
         .alignment(Alignment::Center);
 
+        let target_style = if self.locked {
+            Style::default().fg(Color::DarkGray)
+        } else if self.selected {
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::Cyan)
+        } else {
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::White)
+        };
+
         let target_line = Line::from(vec![
-            Span::styled("target: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                format!("{:.1} {}", self.value, self.unit),
-                Style::default()
-                    .add_modifier(Modifier::BOLD)
-                    .fg(if self.selected {
-                        Color::Cyan
-                    } else {
-                        Color::White
-                    }),
-            ),
+            Span::styled("target:  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{:.1} {}", self.value, self.unit), target_style),
         ])
         .alignment(Alignment::Center);
 
@@ -99,10 +129,16 @@ impl Widget for &ControlWidget {
         let bar_width = inner.width.saturating_sub(4) as usize;
         let filled = (bar_width as f32 * ratio).round() as usize;
         let bar = format!("[{}{}]", "#".repeat(filled), "-".repeat(bar_width - filled));
+        let bar_style = if self.locked {
+            Style::default().fg(Color::DarkGray)
+        } else {
+            Style::default()
+        };
+
         let bar_line = Line::from(vec![
-            Span::styled("-", Style::default()),
-            Span::styled(bar, Style::default()),
-            Span::styled("+", Style::default()),
+            Span::styled("-", bar_style),
+            Span::styled(bar, bar_style),
+            Span::styled("+", bar_style),
         ]);
 
         let lines: [(&Line, bool); 3] = [
@@ -126,3 +162,32 @@ impl Widget for &ControlWidget {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lock_prevents_modification() {
+        let mut widget = ControlWidget::new("Temp", 100.0, "°C", 5.0, 20.0, 300.0);
+        assert_eq!(widget.value, 100.0);
+
+        widget.increase();
+        assert_eq!(widget.value, 105.0);
+
+        widget.set_locked(true);
+        assert!(widget.locked);
+        assert!(!widget.selected);
+
+        // Increase and decrease should be no-ops when locked
+        widget.increase();
+        assert_eq!(widget.value, 105.0);
+        widget.decrease();
+        assert_eq!(widget.value, 105.0);
+
+        widget.set_locked(false);
+        widget.decrease();
+        assert_eq!(widget.value, 100.0);
+    }
+}
+
