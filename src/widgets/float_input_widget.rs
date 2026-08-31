@@ -1,8 +1,5 @@
-use std::io::Error;
 
 use ratatui::{
-    DefaultTerminal,
-    layout::{Constraint, Layout},
     style::{Color, Style},
     widgets::{Block, Borders, Widget},
 };
@@ -44,7 +41,9 @@ impl<'a> FloatInputWidget<'a> {
             Input {
                 key: Key::Enter, ..
             } if self.is_valid => {
-                FloatInput::Some(self.textarea.lines()[0].parse::<f32>().unwrap())
+                let value = self.textarea.lines()[0].parse::<f32>().unwrap();
+                self.textarea.clear();
+                FloatInput::Some(value)
             }
             Input {
                 key: Key::Char('m'),

@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::time::{Duration, Instant};
 
-use ratatui::layout;
 use ratatui::{
     DefaultTerminal, Frame,
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
@@ -9,7 +8,6 @@ use ratatui::{
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
 };
-use serde_json::value;
 
 use crate::atmoweb::AtmoWeb;
 use crate::widgets::control_widget::ControlWidget;
@@ -120,6 +118,7 @@ impl App {
                                 _ => {}
                             }
                         }
+                        self.send_current_value().await;
                     } else {
                         terminal.draw(|frame| self.draw(frame))?;
                         self.handle_events().await?;
