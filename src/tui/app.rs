@@ -13,7 +13,7 @@ use crate::atmoweb::AtmoWeb;
 use crate::widgets::control_widget::ControlWidget;
 use crate::widgets::graph_widget::GraphWidget;
 
-const REFRESH_INTERVAL: Duration = Duration::from_millis(50);
+const REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Focus {
@@ -49,6 +49,7 @@ pub struct App {
     graph: GraphWidget,
     focus: Focus,
     online: bool,
+    editing: bool,
     last_refresh: Instant,
 }
 
@@ -70,6 +71,7 @@ impl App {
             graph: GraphWidget::new("Temperature Curve", "°C", 0.0, 300.0),
             focus: Focus::Temp,
             online: false,
+            editing: false,
             last_refresh: Instant::now() - REFRESH_INTERVAL,
         }
     }
@@ -80,9 +82,20 @@ impl App {
                 self.refresh().await;
                 self.last_refresh = Instant::now();
             }
-
-            terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events().await?;
+            
+            if self.editing {
+                if let Ok(value) = crate::widgets::float_input_widget::float_input_widget(
+                    terminal,
+                ) {
+                    self.focused_widget_mut().set_target(value);
+                }
+                self.editing = false;
+                
+                self.send_current_value().await;
+            } else {
+                terminal.draw(|frame| self.draw(frame))?;
+                self.handle_events().await?;
+            }    
         }
         Ok(())
     }
@@ -203,6 +216,7 @@ impl App {
                     KeyCode::Char('0') => self.change_focus(Focus::Temp),
                     KeyCode::Char('1') => self.change_focus(Focus::Flap),
                     KeyCode::Char('2') => self.change_focus(Focus::Fan),
+                    KeyCode::Char('e') => self.editing = true,
                     _ => {}
                 }
             }

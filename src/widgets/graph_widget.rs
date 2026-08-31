@@ -10,7 +10,7 @@ use ratatui::{
 };
 
 /// Wie viele Messpunkte im Verlauf aufgehoben werden.
-const HISTORY_LEN: usize = 60;
+const HISTORY_LEN: usize = 512;
 
 pub struct GraphWidget {
     pub title: String,
@@ -69,19 +69,15 @@ impl Widget for &GraphWidget {
         let datasets = vec![
             Dataset::default()
                 .name("current")
-                .marker(symbols::Marker::Braille)
+                .marker(symbols::Marker::Dot)
                 .graph_type(GraphType::Line)
                 .style(Style::default().fg(Color::Green))
                 .data(&current_data),
             Dataset::default()
                 .name("target")
-                .marker(symbols::Marker::Braille)
+                .marker(symbols::Marker::Dot)
                 .graph_type(GraphType::Line)
-                .style(
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )
+                .style(Style::default().fg(Color::Yellow))
                 .data(&target_data),
         ];
 

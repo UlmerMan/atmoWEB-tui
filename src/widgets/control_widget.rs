@@ -50,6 +50,10 @@ impl ControlWidget {
     pub fn set_current(&mut self, current: f32) {
         self.current = current;
     }
+
+    pub fn set_target(&mut self, target: f32) {
+        self.value = target.clamp(self.min, self.max);
+    }
 }
 
 impl Widget for &ControlWidget {
