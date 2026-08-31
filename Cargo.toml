@@ -2,8 +2,14 @@
 name = "atmoweb-tui"
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.85"
 description = "A terminal UI for monitoring and controlling an oven via the AtmoWeb API"
-license = "GPL-3.0"
+license = "GPL-3.0-only"
+readme = "README.md"
+repository = "https://github.com/UlmerMan/atmoWEB-tui"
+homepage = "https://github.com/UlmerMan/atmoWEB-tui"
+keywords = ["tui", "ratatui", "memmert", "oven", "temperature"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 reqwest = { version = "0.13.4", features = ["json"] }
