@@ -1,14 +1,11 @@
-use std::{f32::consts::E, io::Error};
+use std::io::Error;
 
 use ratatui::{
     DefaultTerminal,
-    buffer::Buffer,
     layout::Constraint,
     layout::Layout,
-    layout::Rect,
     style::{Color, Style},
-    text::Span,
-    widgets::{Block, Borders, Widget},
+    widgets::{Block, Borders},
 };
 
 use ratatui_textarea::{Input, Key, TextArea};
